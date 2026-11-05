@@ -1,0 +1,1042 @@
+# MASTER BUILD PROMPT — SHUDHI LOGISTICS MANAGEMENT PLATFORM
+
+## 1. Project objective
+
+Build a complete, responsive, interactive web application named **SHUDHI LOGISTICS — Integrated Logistics Operations & Management Platform**.
+
+This is a multi-city logistics management platform for coordinating:
+
+1. First-mile pickup from customers or sub-agents.
+2. Mid-mile transportation through APSRTC Logistics.
+3. Last-mile delivery through independent local delivery partners.
+4. Sub-agent booking management and settlements.
+5. Customer communication and shipment tracking.
+6. Financial management, collections, transporter payables and operational profitability.
+7. WhatsApp-based communication and operational automation.
+
+This must be a functional application with working forms, navigation, data management, role-based access, status transitions, calculations, filters, reports and realistic workflows.
+
+**Do not build a static UI, landing page, or clickable visual prototype with non-functional buttons.**
+
+Use the uploaded `shudhi_logistics_app.tsx` as the reference for the existing Version 1. Preserve useful functionality, improve the architecture, fix bugs and extend the application. Do not blindly copy its limitations.
+
+## 2. Business model and operating structure
+
+SHUDHI Logistics operates as the primary logistics agent.
+
+APSRTC Logistics is the mid-mile transportation provider.
+
+SHUDHI manages:
+- Customer acquisition and booking coordination.
+- Sub-agent network management.
+- First-mile pickup coordination.
+- Shipment handover to APSRTC.
+- Mid-mile tracking and exception management.
+- Destination coordination.
+- Last-mile delivery through local delivery partners.
+- Customer collections and payment tracking.
+- Agent commissions and settlements.
+- Local pickup and delivery partner payments.
+
+APSRTC Logistics portal reference:
+https://logistics.apsrtconline.in/login
+
+Do not attempt to access or automate this external portal without authorized API access. For the initial build, provide a functional APSRTC simulation with the ability to enter actual transporter references and update tracking manually. Design the integration layer so a genuine API can be connected later.
+
+### Network structure
+
+SHUDHI operates across four cities with 13 sub-agents.
+
+| City | Sub-agent IDs |
+|---|---|
+| Visakhapatnam | VSP-A1, VSP-A2, VSP-A3, VSP-A4, VSP-A5 |
+| Rajamahendravaram | RJY-A1 |
+| Vijayawada | VJW-A1, VJW-A2, VJW-A3, VJW-A4 |
+| Hyderabad | HYD-A1, HYD-A2, HYD-A3 |
+
+Create these 13 sub-agents as initial demo records.
+
+Each sub-agent must have:
+- Unique agent ID.
+- Name and contact details.
+- City and operating address.
+- Login credentials or demo login identity.
+- Active/inactive status.
+- Commission or margin configuration.
+- Booking history.
+- Collection and settlement history.
+- Performance metrics.
+
+SHUDHI must be able to add, edit, deactivate and manage sub-agents.
+
+### Local delivery partners
+
+Create an independent local partner directory.
+
+Initial demo records:
+- VSP-P1 — Visakhapatnam Partner 1.
+- RJY-P1 — Rajamahendravaram Partner 1.
+- VJW-P1 — Vijayawada Partner 1.
+- HYD-P1 — Hyderabad Partner 1.
+
+Each partner must have:
+- Partner ID.
+- Name.
+- Phone number.
+- City.
+- Service type: pickup, delivery or both.
+- Payment responsibility: SHUDHI or sub-agent.
+- Payment rate or agreed amount.
+- Availability status.
+- Assigned tasks.
+- Completed tasks.
+- Failed tasks.
+- Payment history.
+
+Allow SHUDHI to add multiple partners per city.
+
+Partners must only see tasks specifically assigned to them.
+
+## 3. Application architecture and technology
+
+Build using a modern, maintainable web application architecture.
+
+Preferred stack:
+- React.
+- TypeScript.
+- Vite.
+- Tailwind CSS.
+- Lucide React icons.
+- React Router or equivalent routing.
+- Supabase-ready backend architecture.
+- Local demo persistence for the initial working build.
+
+Organize the code into reusable components, pages, services, hooks and data models. Do not place the entire application in one enormous component.
+
+Use environment variables for all future API credentials.
+
+### Data persistence
+
+For the initial demo:
+- Persist data across page refreshes.
+- Use localStorage or IndexedDB appropriately.
+- Provide realistic seed data.
+- Allow records to be created, edited and updated.
+- Provide a reset-demo-data option.
+- Avoid losing existing data during ordinary navigation.
+
+Design the data layer to migrate to Supabase PostgreSQL, Supabase Auth and Supabase Storage.
+
+Do not claim localStorage is secure authentication or suitable for production multi-user access.
+
+If Supabase credentials are not configured, the application must still work in demo mode.
+
+## 4. User roles and access control
+
+Create separate role-based experiences.
+
+### Role 1: SHUDHI ADMIN / HEAD OFFICE
+
+Full operational access.
+
+Can:
+- View all cities and bookings.
+- Create direct bookings.
+- Approve or reject sub-agent bookings.
+- Review customer-originated booking requests.
+- Assign pickup and delivery partners.
+- Manage APSRTC references and tracking.
+- Monitor shipment exceptions.
+- Manage agents and partners.
+- Configure commercial terms and rates.
+- View collections and settlements.
+- Manage WhatsApp communications.
+- Generate financial and operational reports.
+- View audit logs.
+- Manage application settings.
+
+### Role 2: SUB-AGENT
+
+Each sub-agent must have an individual login.
+
+Can:
+- Create bookings under their own agent ID.
+- View only their own bookings.
+- View booking approval status.
+- Track their shipments.
+- View pickup and delivery progress.
+- View their financial statements.
+- View their own collection and settlement information.
+- Submit customer booking requests.
+- Communicate with SHUDHI through the Agent Desk.
+
+Cannot:
+- Access other sub-agents' bookings.
+- Access another agent's financial information.
+- Change SHUDHI commercial settings.
+- Approve their own pending bookings.
+- Assign or view unrelated partners' tasks.
+
+**Important:** A booking remains owned by the original sub-agent even when SHUDHI centrally manages its operations.
+
+### Role 3: LOCAL PICKUP / DELIVERY PARTNER
+
+Create a simplified mobile-first interface.
+
+Can:
+- View only assigned tasks.
+- Accept or reject assigned tasks.
+- View customer contact details required for the assigned job.
+- View pickup or delivery address.
+- Open Google Maps navigation.
+- Update task status.
+- Upload actual pickup proof photographs.
+- Upload proof of delivery photographs or signatures.
+- Report failed pickup or delivery with a mandatory reason.
+- View completed task history.
+- View payable amount and payment status.
+
+Cannot:
+- View all bookings.
+- View financial information belonging to SHUDHI or sub-agents.
+- View other partners' tasks.
+- Modify booking prices or transporter references.
+
+### Role 4: CUSTOMER
+
+Create a customer-facing tracking and booking experience.
+
+Customers should be able to:
+- Submit a booking request.
+- Enter sender and receiver details.
+- Select pickup or hub-drop options.
+- Select delivery or destination-hub collection.
+- Enter shipment details.
+- Upload package photographs.
+- Receive a booking reference.
+- Track shipment status.
+- Request customer support.
+
+Customer-originated requests must enter the SHUDHI review queue before confirmation.
+
+For the demo, customer access can be simulated without production authentication.
+
+### Demo login
+
+Provide a convenient role-selection login screen for demonstration.
+
+Include:
+- SHUDHI Admin.
+- All 13 sub-agents.
+- Local partners.
+- Customer simulation.
+
+Clearly label demo logins as demonstration access. Do not present them as production-secure authentication.
+
+## 5. Main application navigation
+
+Create a clean professional dashboard with a persistent sidebar and responsive mobile navigation.
+
+Main navigation:
+
+1. Dashboard.
+2. Bookings.
+3. Booking Approval Queue.
+4. First-Mile Pickups.
+5. APSRTC Transit Tracking.
+6. Last-Mile Deliveries.
+7. Sub-Agent Management.
+8. Local Partner Management.
+9. WhatsApp Communication Centre.
+10. Finance & Settlements.
+11. Reports & Analytics.
+12. Audit Logs.
+13. Settings.
+
+Show navigation items according to user permissions.
+
+## 6. Dashboard and management overview
+
+Create a comprehensive SHUDHI Admin dashboard.
+
+Display KPI cards:
+
+- Total Bookings.
+- Today's Bookings.
+- Pending Approvals.
+- Approved Bookings.
+- Active Pickups.
+- Shipments in Transit.
+- Active Deliveries.
+- Successfully Delivered.
+- Failed / Exception Shipments.
+- Pending Customer Collections.
+- APSRTC Payables.
+- Pending Agent Settlements.
+- Pending Partner Payments.
+- Net Operational Margin.
+
+Provide filters for:
+- Date range.
+- City.
+- Sub-agent.
+- Shipment status.
+- Booking source.
+
+Add charts:
+- Daily booking trends.
+- City-wise booking distribution.
+- Shipment status distribution.
+- Revenue and collection trends.
+- City-wise operational performance.
+- Sub-agent performance.
+
+Include a recent activity feed showing important operational events.
+
+Sub-agent dashboards must display only their own data.
+
+Partner dashboards must display only their assigned tasks and payment information.
+
+## 7. Booking management module
+
+This is the core module.
+
+Support three booking sources:
+
+1. SHUDHI Admin direct bookings.
+2. Sub-agent bookings.
+3. Customer WhatsApp / customer portal requests.
+
+### Booking creation form
+
+Create a structured booking form with the following fields.
+
+**Booking information**
+- Booking ID, automatically generated.
+- Booking date and time.
+- Booking source.
+- Original booking owner.
+- City.
+- Booking status.
+
+**Sender information**
+- Sender name.
+- Mobile number.
+- Origin city.
+- Full address.
+- Pincode.
+- Pickup type: Door Pickup / Agent Hub Drop.
+
+**Receiver information**
+- Receiver name.
+- Mobile number.
+- Destination city.
+- Full address.
+- Pincode.
+- Delivery type: Door Delivery / Destination Hub Collection.
+
+**Shipment information**
+- Package type: Carton Box, Gunny Bag, Document, Pallet, Other.
+- Number of packages.
+- Actual weight.
+- Volumetric weight.
+- Declared value.
+- Package description.
+- Package photographs.
+- Special handling instructions.
+
+**Commercial information**
+- Customer freight charge.
+- Customer payment mode.
+- Collection status.
+- APSRTC transporter charge.
+- Pickup cost.
+- Delivery cost.
+- Sub-agent margin.
+- SHUDHI margin.
+- Additional charges.
+- Discount.
+- Total customer payable.
+
+Do not expose internal commercial information to customers or unauthorized partners.
+
+### Booking approval logic
+
+- SHUDHI Admin direct booking: may be approved immediately.
+- Sub-agent booking: must enter the approval queue.
+- Customer-originated booking: must enter the SHUDHI review queue.
+- Admin can approve or reject with a reason.
+- Rejected bookings must retain their history.
+- Approved bookings become eligible for first-mile operations.
+
+Booking ID should be unique and searchable.
+
+Provide search by:
+- SHUDHI Booking ID.
+- APSRTC reference.
+- AWB / consignment number.
+- Sender mobile.
+- Receiver mobile.
+- Agent ID.
+
+Allow booking details to be opened in a full detail view with an event timeline.
+
+## 8. Shipment lifecycle and tracking
+
+Implement a proper shipment state machine.
+
+Use the following statuses:
+
+### Booking
+- Pending Approval.
+- Approved.
+- Rejected.
+
+### First-mile pickup
+- Pickup Initiated.
+- Out for Pickup.
+- Pickup Completed.
+- Pickup Failed.
+- Handed at Origin HUB.
+
+### Mid-mile transportation
+- At Origin HUB.
+- Dispatched / On the Way.
+- At Transhipment.
+- Journey Resumed.
+- Reached Destination HUB.
+- Unloaded at Destination HUB.
+
+### Last-mile delivery
+- At Delivery Facility.
+- Delivery Initiated.
+- Out for Delivery.
+- Delivered.
+- Delivery Failed.
+
+### Exceptions
+- Exception / Issue.
+- Cancelled.
+- Returned, if enabled by SHUDHI Admin.
+
+Every status change must:
+- Record date and time.
+- Record the user who performed the action.
+- Record the previous status and new status.
+- Allow an optional or mandatory reason depending on the action.
+- Appear in the shipment timeline.
+
+Prevent invalid status transitions.
+
+Provide a visual tracking timeline for each shipment.
+
+## 9. First-mile pickup operations
+
+Create a dedicated pickup management screen.
+
+Display approved bookings requiring pickup.
+
+Admin can:
+- Assign a partner based on the origin city.
+- Self-assign a task.
+- View pickup address and customer contact.
+- Send a task notification through the WhatsApp simulator.
+- Monitor acceptance.
+- Monitor task progress.
+- Review proof of pickup.
+- Handle failed pickup.
+- Reassign tasks.
+
+Partner can:
+- Accept or reject the assigned task.
+- Mark Out for Pickup.
+- Upload actual proof photograph.
+- Mark Pickup Completed.
+- Report failure and select a reason.
+
+After pickup completion, SHUDHI Admin can confirm handover to the APSRTC origin HUB.
+
+Provide map navigation using the customer's address.
+
+Do not use fabricated map routes. Use a valid address-based Google Maps directions link when coordinates are unavailable.
+
+## 10. APSRTC mid-mile operations
+
+Create an independent transporter tracking module.
+
+For each shipment, store:
+- SHUDHI Booking ID.
+- APSRTC booking reference.
+- APSRTC AWB / consignment number.
+- Booking date.
+- Origin HUB.
+- Destination HUB.
+- Transporter freight.
+- Current transporter status.
+- Last updated timestamp.
+- Notes.
+- Supporting documents, where applicable.
+
+Allow admin to:
+- Enter the APSRTC reference manually.
+- Enter the AWB.
+- Update shipment status.
+- Record transporter charges.
+- Record HUB handover.
+- Record destination arrival.
+- Record delays or exceptions.
+
+Create a clear distinction between:
+- SHUDHI operational status.
+- APSRTC transporter status.
+
+Provide a transporter integration service layer for a future authorized API.
+
+**Never invent a live APSRTC booking confirmation or tracking result.** Clearly label simulated records as Demo / Simulated.
+
+## 11. Last-mile delivery operations
+
+Create a destination-side delivery management module.
+
+After shipment reaches the destination HUB:
+- Confirm unloading.
+- Move shipment to Delivery Facility.
+- Assign a local delivery partner.
+- Notify the partner.
+- Monitor acceptance.
+- Mark Out for Delivery.
+- Upload proof of delivery.
+- Confirm successful delivery.
+
+For failed deliveries:
+- Require a failure reason.
+- Record attempt date and time.
+- Notify SHUDHI Admin.
+- Allow re-initiation or reassignment.
+- Maintain previous attempts in the timeline.
+
+Support delivery types:
+- Door delivery.
+- Destination HUB collection.
+
+For COD or customer collection, show the correct amount to collect based on the booking's commercial configuration.
+
+## 12. Local partner task management
+
+Create a dedicated partner management module.
+
+Each partner must have:
+- Profile.
+- City.
+- Phone.
+- Assigned service areas.
+- Task history.
+- Current task status.
+- Completed tasks.
+- Failed tasks.
+- Payment responsibility.
+- Payable amount.
+- Settlement status.
+
+Allow admin to:
+- Add/edit/deactivate partners.
+- Assign or reassign tasks.
+- Configure payment rates.
+- View partner performance.
+- View pending payments.
+- Record payments and references.
+
+Partners should have a mobile-friendly task list with clear action buttons.
+
+## 13. Financial management and commercial engine
+
+This module is extremely important.
+
+Build a proper financial ledger rather than a basic revenue summary.
+
+Each booking must have an independent commercial breakdown.
+
+### Revenue and collection
+
+Track:
+- Customer freight charge.
+- Additional customer charges.
+- Discounts.
+- Total amount payable by customer.
+- Amount collected.
+- Outstanding customer balance.
+- Payment method.
+- Collection date.
+- Collection responsibility.
+
+### APSRTC transporter payable
+
+Track:
+- APSRTC freight payable.
+- Actual transporter charge.
+- Payment status.
+- Payment reference.
+- Payment date.
+
+### First-mile and last-mile expenses
+
+Track:
+- Pickup partner charge.
+- Delivery partner charge.
+- Other local operating expenses.
+- Who is responsible for paying each partner: SHUDHI or the sub-agent.
+- Whether the amount is paid or outstanding.
+
+### Sub-agent margin
+
+SHUDHI must be able to configure the margin for each sub-agent.
+
+Track:
+- Sub-agent margin percentage or fixed amount.
+- Margin per booking.
+- Amount payable to sub-agent.
+- Settlement status.
+
+### SHUDHI margin and profitability
+
+Calculate the financial result without double counting.
+
+Use a transparent formula:
+
+**Net Operational Contribution = Customer Freight Revenue − APSRTC Transporter Cost − Actual Pickup Cost − Actual Delivery Cost − Other Direct External Expenses − Sub-Agent Margin.**
+
+If the SHUDHI margin is defined as a separate allocation rather than an additional external expense, do not deduct it again.
+
+Internal margin allocations and external payments must be clearly distinguished.
+
+The system must not count a partner payment twice when responsibility belongs to a sub-agent.
+
+### Settlement management
+
+Create separate settlement ledgers for:
+- Sub-agents.
+- Pickup partners.
+- Delivery partners.
+- APSRTC transporter.
+
+Allow:
+- Pending settlement.
+- Part payment.
+- Full payment.
+- Payment reference.
+- Payment date.
+- Settlement notes.
+- Downloadable statement.
+
+Create a complete booking-wise financial statement.
+
+Do not treat a simulated payment as an actual bank transaction.
+
+## 14. WhatsApp communication architecture
+
+Build a dedicated WhatsApp Communication Centre.
+
+The long-term requirement is to operate using one official SHUDHI WhatsApp Business Platform / Cloud API number, with a central message router and three separate logical assistants.
+
+**Do not create three unrelated WhatsApp numbers by default.**
+
+### Assistant 1: Customer Care
+
+Functions:
+- Customer enquiries.
+- Booking requests.
+- Booking confirmation.
+- Shipment tracking.
+- Delivery status.
+- Customer support.
+- Human handover.
+- Customer notifications.
+
+The customer assistant must retrieve actual booking information from the database.
+
+Never invent prices, booking references, or shipment statuses.
+
+### Assistant 2: Agent Desk
+
+Functions:
+- New booking notifications.
+- Booking approval notifications.
+- Pending booking reminders.
+- Daily performance reports.
+- Shipment status updates.
+- Payment and settlement summaries.
+- Operational announcements.
+
+Support commands such as:
+- TODAY REPORT.
+- PENDING BOOKINGS.
+- MY SHIPMENTS.
+- PAYMENT SUMMARY.
+- HELP.
+
+Create a configurable daily report schedule, with an example default of 8:30 AM.
+
+### Assistant 3: Field Operations
+
+Functions:
+- Pickup task assignment.
+- Delivery task assignment.
+- Task acceptance or rejection.
+- Address and contact sharing.
+- Google Maps navigation links.
+- Pickup completion.
+- Delivery completion.
+- Proof photograph submission.
+- Failure reporting.
+- Task reminders.
+
+The partner should receive only their assigned task details.
+
+### WhatsApp routing logic
+
+Use the registered mobile number and user role to identify the conversation.
+
+Route:
+- Customers → Customer Care.
+- Sub-agents → Agent Desk.
+- Local partners → Field Operations.
+
+Unknown numbers should enter a customer enquiry or support workflow.
+
+Apply server-side role and ownership checks. Never rely on a phone number supplied in a message as the sole authorization mechanism.
+
+### WhatsApp demo functionality
+
+The initial application must contain a working WhatsApp simulator.
+
+Allow the user to switch between:
+- Customer identity.
+- Each sub-agent identity.
+- Each local partner identity.
+
+Simulate messages, conversation history, message routing, booking creation, tracking and task updates.
+
+The simulator must interact with the same application data rather than maintaining unrelated mock records.
+
+### Real WhatsApp integration readiness
+
+Prepare:
+- Webhook endpoint structure.
+- Incoming message processing service.
+- Outgoing message service.
+- Phone number and role mapping.
+- Template message support.
+- Media upload and retrieval.
+- Conversation storage.
+- Human handover.
+
+Use only the official WhatsApp Business Platform / Cloud API for the real integration.
+
+Do not use unofficial WhatsApp libraries, WhatsApp Web scraping or browser automation.
+
+Do not claim real messages have been sent unless the official API is connected and confirms the operation.
+
+Clearly distinguish demo simulation from live integration.
+
+## 15. Proof of pickup and proof of delivery
+
+Implement actual file upload functionality in the application.
+
+For pickup proof:
+- Capture or upload photograph.
+- Link it to the booking and task.
+- Record uploader and timestamp.
+- Display proof in the booking timeline.
+
+For delivery proof:
+- Capture or upload photograph.
+- Allow recipient name.
+- Allow signature or delivery confirmation where applicable.
+- Record uploader and timestamp.
+- Display proof in the booking timeline.
+
+For the local demo, store uploaded files in an appropriate browser-accessible storage mechanism or provide a clear demo storage adapter.
+
+Prepare Supabase Storage integration for production.
+
+Do not use alert boxes pretending that an image has been uploaded.
+
+## 16. Reports and analytics
+
+Create downloadable CSV reports and filtered report views.
+
+Required reports:
+
+1. Daily booking report.
+2. City-wise booking report.
+3. Sub-agent performance report.
+4. Pickup operations report.
+5. Delivery operations report.
+6. APSRTC transporter payable report.
+7. Customer collection report.
+8. Pending collection report.
+9. Sub-agent margin statement.
+10. Sub-agent settlement statement.
+11. Local partner payable statement.
+12. Partner payment statement.
+13. Shipment exception report.
+14. Booking-wise profitability report.
+15. Monthly operational performance report.
+
+All report totals must derive from actual application records.
+
+Provide date, city and agent filters.
+
+## 17. Notifications and audit logs
+
+Create an in-app notification centre.
+
+Notify relevant users when:
+- A new booking is submitted.
+- A booking is approved or rejected.
+- A pickup is assigned.
+- A partner accepts or rejects a task.
+- Pickup is completed.
+- A shipment reaches the destination HUB.
+- A delivery is assigned.
+- Delivery is completed or failed.
+- A payment or settlement is recorded.
+
+Maintain an audit log of important actions:
+- Booking creation.
+- Booking approval.
+- Booking rejection.
+- Assignment and reassignment.
+- Status changes.
+- Financial changes.
+- Settlements.
+- User management changes.
+
+Each log should contain user, action, record ID, timestamp and relevant details.
+
+## 18. User interface and design direction
+
+Build a professional logistics SaaS interface.
+
+Design language:
+- Clean, modern and premium.
+- Deep navy / slate sidebar.
+- White content panels.
+- Teal as the primary action colour.
+- Clear status colours.
+- Good typography.
+- Consistent spacing.
+- Professional tables and KPI cards.
+- Responsive desktop, tablet and mobile layouts.
+
+The application should feel like a real logistics management ERP.
+
+Use:
+- Collapsible sidebar.
+- Clear page titles.
+- Breadcrumbs where useful.
+- Search and filter controls.
+- Detail drawers or dedicated detail pages.
+- Confirmation dialogs for important actions.
+- Form validation and error messages.
+- Toast notifications.
+- Loading, empty and error states.
+
+Do not use browser alert boxes as the primary interface.
+
+### Mobile-first partner experience
+
+Partner screens must be optimized for mobile phones:
+- Large action buttons.
+- Simple task cards.
+- Easy status updates.
+- Camera upload.
+- Address navigation.
+- Minimal unnecessary information.
+
+## 19. Demo data and realistic workflows
+
+Seed the application with realistic demo records across all four cities.
+
+Create:
+- 13 sub-agents.
+- At least one local partner per city.
+- At least 40–60 sample shipments.
+- Different booking sources.
+- Different shipment statuses.
+- Pending approvals.
+- Pickup assignments.
+- Shipments in transit.
+- Pending deliveries.
+- Delivered shipments.
+- Failed pickup/delivery cases.
+- Financial records.
+- Pending and completed settlements.
+- WhatsApp conversations.
+
+Use consistent relationships between bookings, agents, partners, shipment events and financial records.
+
+Do not generate contradictory or impossible shipment timelines.
+
+Create a reset-demo-data action for testing.
+
+## 20. Critical validation and business rules
+
+Implement the following safeguards:
+
+1. A sub-agent cannot see another agent's bookings.
+2. A partner cannot see another partner's tasks.
+3. Customer access cannot reveal internal financial details.
+4. Only authorized users can approve bookings.
+5. Only assigned partners can update their tasks.
+6. Failed pickup and delivery require reasons.
+7. Pickup and delivery proof must be attached to the correct task.
+8. Booking status must follow valid transitions.
+9. Every financial transaction must be linked to a booking or settlement.
+10. Internal margins must not be counted as external expenses.
+11. A settlement must not be duplicated.
+12. A booking must not be marked delivered before destination processing is complete.
+13. All important status changes must create an audit event.
+14. Search and filters must work across the relevant records.
+15. Data must persist after refreshing the browser.
+
+## 21. Build and implementation instructions
+
+Work through the following priorities:
+
+**Priority 1 — Functional foundation**
+- Create the application structure.
+- Implement navigation and responsive layout.
+- Implement role-based demo login.
+- Implement seed data and persistent data services.
+- Implement dashboards.
+
+**Priority 2 — Core operations**
+- Booking creation.
+- Approval queue.
+- Booking ownership.
+- Pickup management.
+- APSRTC tracking.
+- Delivery management.
+- Partner assignments.
+- Shipment timelines.
+
+**Priority 3 — Commercial engine**
+- Pricing configuration.
+- Collections.
+- APSRTC payables.
+- Local partner expenses.
+- Sub-agent margins.
+- Settlements.
+- Profitability reports.
+
+**Priority 4 — Communication**
+- WhatsApp simulator.
+- Customer Care.
+- Agent Desk.
+- Field Operations.
+- Admin unified inbox.
+- Notification centre.
+
+**Priority 5 — Quality and integration readiness**
+- Proof uploads.
+- CSV exports.
+- Audit logs.
+- Form validation.
+- Mobile responsiveness.
+- Supabase-ready architecture.
+- Official WhatsApp API integration points.
+- Authorized APSRTC integration points.
+
+Do not stop after creating the dashboard or login page. Continue implementing the modules and their connected workflows.
+
+If the complete implementation cannot fit into one generation, build it in coherent phases while maintaining a working application after each phase. Do not replace working modules with placeholder screens.
+
+## 22. Required acceptance tests
+
+Before declaring the build complete, test these workflows:
+
+**Test A — Sub-agent booking**
+1. Login as VSP-A1.
+2. Create a shipment booking.
+3. Confirm that it is owned by VSP-A1.
+4. Confirm that it enters Pending Approval.
+5. Login as SHUDHI Admin.
+6. Approve the booking.
+7. Confirm that the booking becomes available for pickup operations.
+
+**Test B — First-mile pickup**
+1. Assign the booking to VSP-P1.
+2. Login as VSP-P1.
+3. Confirm that only assigned tasks are visible.
+4. Accept the task.
+5. Mark Out for Pickup.
+6. Upload pickup proof.
+7. Complete pickup.
+8. Confirm the status and timeline update.
+
+**Test C — APSRTC transit**
+1. Confirm handover to origin HUB.
+2. Enter an APSRTC reference and AWB.
+3. Update transporter status.
+4. Confirm destination HUB arrival.
+5. Confirm the booking becomes available for last-mile processing.
+
+**Test D — Last-mile delivery**
+1. Move shipment to Delivery Facility.
+2. Assign a destination partner.
+3. Login as that partner.
+4. Accept and execute the task.
+5. Upload proof of delivery.
+6. Complete delivery.
+7. Confirm the customer-facing tracking status.
+
+**Test E — Financial calculation**
+1. Open the booking's commercial details.
+2. Enter customer freight.
+3. Enter APSRTC cost.
+4. Enter pickup and delivery expenses.
+5. Enter sub-agent margin.
+6. Confirm the net operational contribution.
+7. Record a settlement.
+8. Confirm that the settlement and outstanding balance update correctly.
+
+**Test F — WhatsApp routing**
+1. Simulate a customer enquiry.
+2. Simulate a sub-agent daily report request.
+3. Simulate a partner task acceptance.
+4. Confirm that each role receives the appropriate response.
+5. Confirm that each conversation interacts with the same application records.
+
+**Test G — Access control**
+1. Login as VSP-A1 and verify that VSP-A2 bookings are not accessible.
+2. Login as a local partner and verify that unassigned tasks are not accessible.
+3. Verify that customers cannot see internal financial data.
+
+## 23. Final delivery requirements
+
+Deliver a complete working project with:
+- All source files.
+- Clean and reusable code.
+- Functional navigation.
+- Working role-based demo access.
+- Persistent demo data.
+- Connected operational modules.
+- Functional financial calculations.
+- Functional WhatsApp simulator.
+- Functional proof upload.
+- Working CSV reports.
+- Responsive interface.
+- Clear setup instructions.
+- Environment variable example file.
+- README documentation.
+
+The final application must run independently as a standard React project and be ready for export to GitHub and deployment through Netlify or another suitable hosting provider.
+
+Do not expose API secrets in frontend code.
+
+Do not label simulated integrations as live.
+
+**Most important instruction: Build SHUDHI Logistics as one connected operational system. Every module must share the same booking, agent, partner, shipment, communication and financial records. A change in one module must be reflected in every relevant module.**
+
+Start by examining the uploaded Version 1 source, identify what can be reused, then implement the complete application. Do not ask me to redefine the business model; follow the requirements in this specification.

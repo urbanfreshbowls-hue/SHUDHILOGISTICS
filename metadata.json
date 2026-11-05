@@ -1,0 +1,6 @@
+{
+  "name": "SHUDHI LOGISTICS — Operations Platform",
+  "description": "Integrated multi-city first-mile, mid-mile APSRTC transit, and last-mile logistics operations & management ERP.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
