@@ -12,7 +12,9 @@ import {
   UserRole,
   City,
   TimelineEvent,
-  BookingSource
+  BookingSource,
+  CodEventRecord,
+  ApsrtcLiabilityRecord
 } from '../types';
 import { StorageService } from '../services/storage';
 import { STATUS_META, ALLOWED_TRANSITIONS, calculateNetMargin, CITIES } from '../constants/network';
@@ -62,6 +64,12 @@ interface AppContextType {
   recordDeliveryProof: (bookingId: string, photoUrl: string, recipientName: string, notes?: string) => void;
   reportFailure: (bookingId: string, stage: 'PICKUP' | 'DELIVERY', reason: string) => void;
   updateCommercial: (bookingId: string, updates: Partial<Booking['commercial']>) => void;
+  
+  // Stage 2: COD & APSRTC Corporate Liability Operations
+  recordCodEvent: (bookingId: string, event: Omit<CodEventRecord, 'id' | 'bookingId' | 'timestamp' | 'recordedBy'>) => void;
+  updateApsrtcLiability: (bookingId: string, updates: Partial<ApsrtcLiabilityRecord>) => void;
+  associateApsrtcInvoice: (bookingIds: string[], corporateInvoiceRef: string, corporateBillingPeriod: string) => void;
+  recordApsrtcCorporatePayment: (corporateInvoiceRef: string, paymentRef: string) => void;
   
   // Directory & Settlements
   addAgent: (agent: SubAgent) => void;
@@ -484,14 +492,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (meta?.failureReason) updated.failureReason = meta.failureReason;
       if (meta?.transporterStatusNotes) updated.transporterStatusNotes = meta.transporterStatusNotes;
 
-      // Update commercial settlement flags when reached final milestones
+      // Maintain strict separation between operational delivery and financial settlement
       if (newStatus === 'DELIVERED') {
+        const isCod = b.commercial.paymentMode === 'TO_PAY_COD';
         updated.commercial = {
           ...updated.commercial,
-          collectionStatus: 'COLLECTED',
-          collectedAt: now,
-          deliveryPaymentStatus: 'PAID',
-          subAgentMarginSettled: true
+          // For COD, set collectionStatus to 'PENDING_RECONCILIATION'. For prepaid, preserve verified payment status.
+          collectionStatus: isCod ? 'PENDING_RECONCILIATION' : (b.commercial.collectionStatus || 'PENDING'),
+          // Do NOT automatically mark delivery partner payable as PAID or sub-agent margin as settled
+          deliveryPaymentStatus: b.commercial.deliveryPaymentStatus || 'PENDING',
+          subAgentMarginSettled: b.commercial.subAgentMarginSettled || false
         };
       }
 
@@ -697,10 +707,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         failureReason: null,
         commercial: {
           ...b.commercial,
-          collectionStatus: 'COLLECTED',
-          collectedAt: now,
-          deliveryPaymentStatus: 'PAID',
-          subAgentMarginSettled: true
+          collectionStatus: b.commercial.paymentMode === 'TO_PAY_COD' ? 'PENDING_RECONCILIATION' : (b.commercial.collectionStatus || 'PENDING'),
+          deliveryPaymentStatus: b.commercial.deliveryPaymentStatus || 'PENDING',
+          subAgentMarginSettled: b.commercial.subAgentMarginSettled || false
         },
         timeline: [...b.timeline, newEvent]
       };
@@ -815,6 +824,149 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newRecord;
   }, [addAuditLog, showToast]);
 
+  // Stage 2: COD Multi-Event Ledger Operations
+  const recordCodEvent = useCallback((bookingId: string, eventData: Omit<CodEventRecord, 'id' | 'bookingId' | 'timestamp' | 'recordedBy'>) => {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    const now = new Date().toISOString();
+    const newEvent: CodEventRecord = {
+      id: `COD-EV-${bookingId}-${Date.now()}`,
+      bookingId,
+      timestamp: now,
+      recordedBy: user.name,
+      ...eventData
+    };
+
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      const existingEvents = b.commercial.codEvents || [];
+      const updatedEvents = [...existingEvents, newEvent];
+
+      // Re-evaluate collection status based on verified bank deposits
+      let newCollectionStatus = b.commercial.collectionStatus;
+      const totalDeposited = updatedEvents
+        .filter(e => e.type === 'DEPOSIT_TO_BANK' && e.verificationStatus === 'VERIFIED')
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      if (totalDeposited >= b.commercial.totalCustomerPayable && b.commercial.totalCustomerPayable > 0) {
+        newCollectionStatus = 'COLLECTED';
+      } else if (b.status === 'DELIVERED') {
+        newCollectionStatus = 'PENDING_RECONCILIATION';
+      }
+
+      return {
+        ...b,
+        commercial: {
+          ...b.commercial,
+          collectionStatus: newCollectionStatus,
+          codEvents: updatedEvents
+        }
+      };
+    }));
+
+    addAuditLog('COD_EVENT', bookingId, `Recorded COD ${eventData.type} of ₹${eventData.amount} via ${eventData.method}. From: ${eventData.fromParty} To: ${eventData.toParty}.`);
+    showToast(`COD ${eventData.type} event of ₹${eventData.amount} recorded`, 'success');
+  }, [bookings, user, addAuditLog, showToast]);
+
+  // Stage 2: APSRTC Corporate Liability Operations
+  const updateApsrtcLiability = useCallback((bookingId: string, updates: Partial<ApsrtcLiabilityRecord>) => {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      const currentLiability: ApsrtcLiabilityRecord = b.commercial.apsrtcLiability || {
+        bookingId: b.id,
+        originHub: b.originCity,
+        destHub: b.destCity,
+        lrNumber: b.apsrtcRef || undefined,
+        calculatedFreight: b.commercial.apsrtcFreight || 0,
+        corporateBillingPeriod: (b.date || '2026-11-01').slice(0, 7),
+        reconciliationStatus: b.commercial.apsrtcPaymentStatus === 'PAID' ? 'RECONCILED' : 'UNBILLED',
+        paymentStatus: b.commercial.apsrtcPaymentStatus === 'PAID' ? 'PAID' : 'UNPAID'
+      };
+
+      const updatedLiability: ApsrtcLiabilityRecord = {
+        ...currentLiability,
+        ...updates
+      };
+
+      return {
+        ...b,
+        commercial: {
+          ...b.commercial,
+          apsrtcLiability: updatedLiability,
+          apsrtcPaymentStatus: updatedLiability.paymentStatus === 'PAID' ? 'PAID' : 'PENDING'
+        }
+      };
+    }));
+
+    addAuditLog('APSRTC_LIABILITY_UPDATE', bookingId, `Updated APSRTC corporate liability for shipment ${bookingId}.`);
+    showToast(`APSRTC liability updated for ${bookingId}`, 'success');
+  }, [bookings, addAuditLog, showToast]);
+
+  const associateApsrtcInvoice = useCallback((bookingIds: string[], corporateInvoiceRef: string, corporateBillingPeriod: string) => {
+    if (!corporateInvoiceRef.trim()) return;
+
+    setBookings(prev => prev.map(b => {
+      if (!bookingIds.includes(b.id)) return b;
+      const currentLiability: ApsrtcLiabilityRecord = b.commercial.apsrtcLiability || {
+        bookingId: b.id,
+        originHub: b.originCity,
+        destHub: b.destCity,
+        calculatedFreight: b.commercial.apsrtcFreight || 0,
+        corporateBillingPeriod,
+        reconciliationStatus: 'UNBILLED',
+        paymentStatus: 'UNPAID'
+      };
+
+      return {
+        ...b,
+        commercial: {
+          ...b.commercial,
+          apsrtcLiability: {
+            ...currentLiability,
+            corporateInvoiceRef,
+            corporateBillingPeriod,
+            reconciliationStatus: 'INVOICED'
+          }
+        }
+      };
+    }));
+
+    addAuditLog('APSRTC_INVOICE_ASSOCIATION', corporateInvoiceRef, `Associated corporate invoice ${corporateInvoiceRef} with ${bookingIds.length} shipments.`);
+    showToast(`Invoice ${corporateInvoiceRef} linked to ${bookingIds.length} shipments`, 'success');
+  }, [addAuditLog, showToast]);
+
+  const recordApsrtcCorporatePayment = useCallback((corporateInvoiceRef: string, paymentRef: string) => {
+    if (!corporateInvoiceRef || !paymentRef.trim()) return;
+    const now = new Date().toISOString();
+
+    setBookings(prev => prev.map(b => {
+      if (b.commercial.apsrtcLiability?.corporateInvoiceRef !== corporateInvoiceRef) return b;
+      return {
+        ...b,
+        commercial: {
+          ...b.commercial,
+          apsrtcPaymentStatus: 'PAID',
+          apsrtcPaymentRef: paymentRef,
+          apsrtcLiability: {
+            ...b.commercial.apsrtcLiability,
+            paymentStatus: 'PAID',
+            reconciliationStatus: 'RECONCILED',
+            reconciledAt: now,
+            reconciledBy: user.name,
+            notes: `Corporate invoice settled via payment ref ${paymentRef}`
+          }
+        }
+      };
+    }));
+
+    addAuditLog('APSRTC_CORPORATE_PAYMENT', corporateInvoiceRef, `Recorded corporate invoice payment for ${corporateInvoiceRef}. Payment Ref: ${paymentRef}.`);
+    showToast(`Corporate invoice ${corporateInvoiceRef} marked as PAID`, 'success');
+  }, [user, addAuditLog, showToast]);
+
   // Notifications
   const markNotificationRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -871,6 +1023,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordDeliveryProof,
         reportFailure,
         updateCommercial,
+        recordCodEvent,
+        updateApsrtcLiability,
+        associateApsrtcInvoice,
+        recordApsrtcCorporatePayment,
         addAgent,
         updateAgent,
         addPartner,

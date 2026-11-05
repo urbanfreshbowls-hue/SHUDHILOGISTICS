@@ -1,4 +1,4 @@
-import { Booking, SubAgent, LocalPartner, SettlementRecord, AuditLog, WAConversation, BookingStatus, City, UserRole, TimelineEvent } from '../types';
+import { Booking, SubAgent, LocalPartner, SettlementRecord, AuditLog, WAConversation, BookingStatus, City, UserRole, TimelineEvent, CodEventRecord, ApsrtcLiabilityRecord, PaymentStatus } from '../types';
 import { CITIES, INITIAL_SUB_AGENTS, INITIAL_LOCAL_PARTNERS, calculateNetMargin, STATUS_META } from '../constants/network';
 
 const STORAGE_KEYS = {
@@ -267,6 +267,108 @@ export function generateSeedBookings(): Booking[] {
         }
       }
 
+      // Generate realistic COD events if TO_PAY_COD
+      const codEvents: CodEventRecord[] = [];
+      let finalCollectionStatus: PaymentStatus = collectionStatus;
+      if (paymentMode === 'TO_PAY_COD') {
+        if (status === 'DELIVERED') {
+          // Event 1: Cash collected by delivery driver at doorstep
+          codEvents.push({
+            id: `COD-${id}-1`,
+            bookingId: id,
+            type: 'COLLECTION',
+            method: 'CASH_AT_DOORSTEP',
+            amount: totalCustomerPayable,
+            fromParty: receiverCust.name,
+            toParty: deliveryPartner,
+            timestamp: getPastDate(1, 2),
+            transactionRef: `REC-${id}-01`,
+            verificationStatus: 'VERIFIED',
+            recordedBy: deliveryPartner,
+            notes: 'Cash collected at consignee doorstep upon physical package handover.'
+          });
+
+          // Some bookings have handed over to destination hub
+          if (idCounter % 2 === 0) {
+            codEvents.push({
+              id: `COD-${id}-2`,
+              bookingId: id,
+              type: 'HANDOVER',
+              method: 'DESTINATION_HUB_DEPOSIT',
+              amount: totalCustomerPayable,
+              fromParty: deliveryPartner,
+              toParty: `${destCity} Central Hub Desk`,
+              timestamp: getPastDate(1, 0),
+              transactionRef: `HND-${id}-02`,
+              verificationStatus: 'VERIFIED',
+              recordedBy: 'Hub Supervisor',
+              notes: 'Physical cash received and counted at destination hub counter.'
+            });
+
+            // Some bookings have deposited to bank and verified
+            if (idCounter % 4 === 0) {
+              codEvents.push({
+                id: `COD-${id}-3`,
+                bookingId: id,
+                type: 'DEPOSIT_TO_BANK',
+                method: 'DIRECT_UPI',
+                amount: totalCustomerPayable,
+                fromParty: `${destCity} Central Hub Desk`,
+                toParty: 'SHUDHI Corporate Bank Account',
+                timestamp: getPastDate(0, 18),
+                transactionRef: `BANK-${id}-03`,
+                verificationStatus: 'VERIFIED',
+                recordedBy: 'SHUDHI Finance Desk',
+                notes: 'Settled to corporate bank clearing account.'
+              });
+              finalCollectionStatus = 'COLLECTED';
+            } else {
+              finalCollectionStatus = 'PENDING_RECONCILIATION';
+            }
+          } else {
+            // Handover pending
+            finalCollectionStatus = 'PENDING_RECONCILIATION';
+          }
+
+          // Sample discrepancy case
+          if (idCounter % 9 === 0) {
+            codEvents.push({
+              id: `COD-${id}-DISC`,
+              bookingId: id,
+              type: 'RECONCILIATION_ADJUSTMENT',
+              method: 'CASH_AT_DOORSTEP',
+              amount: -50,
+              fromParty: receiverCust.name,
+              toParty: deliveryPartner,
+              timestamp: getPastDate(1, 1),
+              verificationStatus: 'DISCREPANCY',
+              discrepancyAmount: 50,
+              discrepancyReason: 'Customer paid ₹50 less cash; requested balance waiver.',
+              recordedBy: deliveryPartner,
+              notes: 'Shortfall flagged for finance verification.'
+            });
+            finalCollectionStatus = 'PENDING_RECONCILIATION';
+          }
+        } else {
+          finalCollectionStatus = 'PENDING';
+        }
+      }
+
+      // Generate shipment-wise APSRTC corporate liability record
+      const apsrtcLiability: ApsrtcLiabilityRecord = {
+        bookingId: id,
+        originHub: originCity,
+        destHub: destCity,
+        lrNumber: apsrtcRef || undefined,
+        busNumber: hasApsrtc ? `AP 39 Z ${2100 + (idCounter % 400)}` : undefined,
+        calculatedFreight: apsrtcFreight,
+        corporateBillingPeriod: '2026-11',
+        corporateInvoiceRef: (idCounter % 3 === 0) ? 'INV-APSRTC-2026-11-A' : ((idCounter % 5 === 0) ? 'INV-APSRTC-2026-10-B' : undefined),
+        reconciliationStatus: (idCounter % 3 === 0) ? 'INVOICED' : ((idCounter % 6 === 0) ? 'RECONCILED' : 'UNBILLED'),
+        paymentStatus: (idCounter % 6 === 0) ? 'PAID' : 'UNPAID',
+        notes: 'Calculated under APSRTC corporate cargo contract tariff.'
+      };
+
       bookings.push({
         id,
         date: createdAt.split('T')[0],
@@ -307,21 +409,23 @@ export function generateSeedBookings(): Booking[] {
           discount,
           totalCustomerPayable,
           paymentMode,
-          collectionStatus,
-          collectedAt: collectionStatus === 'COLLECTED' ? createdAt : undefined,
-          collectedBy: collectionStatus === 'COLLECTED' ? 'SHUDHI Finance' : undefined,
+          collectionStatus: finalCollectionStatus,
+          collectedAt: finalCollectionStatus === 'COLLECTED' ? createdAt : undefined,
+          collectedBy: finalCollectionStatus === 'COLLECTED' ? 'SHUDHI Finance' : undefined,
+          codEvents,
           apsrtcFreight,
-          apsrtcPaymentStatus: isDeliveredOrTransit ? 'PAID' : 'PENDING',
-          apsrtcPaymentRef: isDeliveredOrTransit ? `TXN-APS-${1000 + idCounter}` : undefined,
+          apsrtcPaymentStatus: apsrtcLiability.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
+          apsrtcPaymentRef: apsrtcLiability.paymentStatus === 'PAID' ? `TXN-APS-${1000 + idCounter}` : undefined,
+          apsrtcLiability,
           pickupCost,
           pickupPaymentResponsibility: 'SHUDHI',
-          pickupPaymentStatus: isDeliveredOrTransit ? 'PAID' : 'PENDING',
+          pickupPaymentStatus: isDeliveredOrTransit && (idCounter % 2 === 0) ? 'PAID' : 'PENDING',
           deliveryCost,
           deliveryPaymentResponsibility: 'SHUDHI',
-          deliveryPaymentStatus: status === 'DELIVERED' ? 'PAID' : 'PENDING',
+          deliveryPaymentStatus: (status === 'DELIVERED' && idCounter % 3 === 0) ? 'PAID' : 'PENDING',
           otherDirectCosts: otherCosts,
           subAgentMargin,
-          subAgentMarginSettled: status === 'DELIVERED',
+          subAgentMarginSettled: (status === 'DELIVERED' && idCounter % 4 === 0),
           netOperationalMargin
         },
         assignedPickupPartnerId: ['APPROVED', 'PICKUP_INITIATED', 'OUT_FOR_PICKUP', 'PICKUP_COMPLETED', 'PICKUP_FAILED'].includes(status) ? pickupPartner : null,
@@ -525,12 +629,64 @@ export function generateSeedConversations(): Record<string, WAConversation> {
   };
 }
 
+/**
+ * Normalizes legacy booking records to conform with Stage 2 COD and APSRTC liability structures.
+ * This operation is idempotent and backward-compatible.
+ */
+export function normalizeBooking(b: any): Booking {
+  if (!b || !b.id) return b;
+  const isCod = b.commercial?.paymentMode === 'TO_PAY_COD';
+  const codEvents: CodEventRecord[] = Array.isArray(b.commercial?.codEvents) ? b.commercial.codEvents : [];
+
+  // For COD deliveries lacking cash handover evidence, preserve PENDING_RECONCILIATION
+  let collectionStatus = b.commercial?.collectionStatus || 'PENDING';
+  if (isCod && b.status === 'DELIVERED') {
+    const hasReconciled = codEvents.some((ev: CodEventRecord) => ev.type === 'DEPOSIT_TO_BANK' && ev.verificationStatus === 'VERIFIED');
+    if (!hasReconciled && (collectionStatus === 'COLLECTED' || collectionStatus === 'PENDING')) {
+      collectionStatus = 'PENDING_RECONCILIATION';
+    }
+  }
+
+  // Ensure apsrtcLiability exists
+  const apsrtcLiability: ApsrtcLiabilityRecord = b.commercial?.apsrtcLiability || {
+    bookingId: b.id,
+    originHub: b.originCity,
+    destHub: b.destCity,
+    lrNumber: b.apsrtcRef || undefined,
+    busNumber: undefined,
+    calculatedFreight: b.commercial?.apsrtcFreight || 0,
+    corporateBillingPeriod: (b.date || '2026-11-01').slice(0, 7),
+    corporateInvoiceRef: undefined,
+    reconciliationStatus: b.commercial?.apsrtcPaymentStatus === 'PAID' ? 'RECONCILED' : 'UNBILLED',
+    paymentStatus: b.commercial?.apsrtcPaymentStatus === 'PAID' ? 'PAID' : 'UNPAID',
+    notes: 'Legacy record normalized.'
+  };
+
+  return {
+    ...b,
+    commercial: {
+      ...b.commercial,
+      collectionStatus,
+      codEvents,
+      apsrtcLiability
+    }
+  };
+}
+
+export function normalizeBookings(raw: any[]): Booking[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeBooking);
+}
+
 // Storage wrapper methods
 export const StorageService = {
   loadBookings(): Booking[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return normalizeBookings(parsed);
+      }
     } catch (e) {
       console.error('Error loading bookings', e);
     }

@@ -36,8 +36,50 @@ export type PackageType = 'Carton Box' | 'Gunny Bag' | 'Document' | 'Pallet' | '
 export type PickupType = 'DOOR_PICKUP' | 'HUB_DROP';
 export type DeliveryType = 'DOOR_DELIVERY' | 'DEST_HUB_COLLECT';
 export type PaymentMode = 'CASH' | 'UPI_ONLINE' | 'TO_PAY_COD' | 'CREDIT_ACCOUNT';
-export type PaymentStatus = 'PENDING' | 'COLLECTED' | 'WAIVED' | 'REFUNDED';
+export type PaymentStatus = 'PENDING' | 'COLLECTED' | 'PENDING_RECONCILIATION' | 'WAIVED' | 'REFUNDED';
 export type PaymentResponsibility = 'SHUDHI' | 'SUB_AGENT';
+
+// Multi-event COD collection and handover types
+export type CodEventType = 'COLLECTION' | 'HANDOVER' | 'DEPOSIT_TO_BANK' | 'RECONCILIATION_ADJUSTMENT';
+export type CodMethod = 'CASH_AT_DOORSTEP' | 'DESTINATION_HUB_DEPOSIT' | 'DIRECT_UPI' | 'SUB_AGENT_HANDOVER';
+export type CodVerificationStatus = 'PENDING_VERIFICATION' | 'VERIFIED' | 'DISCREPANCY';
+
+export interface CodEventRecord {
+  id: string;
+  bookingId: string;
+  type: CodEventType;
+  method: CodMethod;
+  amount: number;
+  fromParty: string;
+  toParty: string;
+  timestamp: string; // ISO 8601
+  transactionRef?: string;
+  verificationStatus: CodVerificationStatus;
+  recordedBy: string;
+  discrepancyAmount?: number;
+  discrepancyReason?: string;
+  notes?: string;
+}
+
+// APSRTC Corporate Freight Liability types
+export type ApsrtcReconciliationStatus = 'UNBILLED' | 'INVOICED' | 'RECONCILED' | 'DISPUTED';
+export type ApsrtcPaymentStatus = 'UNPAID' | 'PAID';
+
+export interface ApsrtcLiabilityRecord {
+  bookingId: string;
+  originHub: City;
+  destHub: City;
+  lrNumber?: string;
+  busNumber?: string;
+  calculatedFreight: number;
+  corporateBillingPeriod?: string; // e.g. "2026-11"
+  corporateInvoiceRef?: string;
+  reconciliationStatus: ApsrtcReconciliationStatus;
+  paymentStatus: ApsrtcPaymentStatus;
+  reconciledAt?: string;
+  reconciledBy?: string;
+  notes?: string;
+}
 
 export interface TimelineEvent {
   id: string;
@@ -61,10 +103,14 @@ export interface CommercialBreakdown {
   collectedAt?: string;
   collectedBy?: string;
   
+  // Multi-event COD ledger (optional for backward compatibility)
+  codEvents?: CodEventRecord[];
+  
   // Expenses
   apsrtcFreight: number;
   apsrtcPaymentStatus: 'PENDING' | 'PAID';
   apsrtcPaymentRef?: string;
+  apsrtcLiability?: ApsrtcLiabilityRecord;
   
   pickupCost: number;
   pickupPaymentResponsibility: PaymentResponsibility;
@@ -237,3 +283,6 @@ export interface WAConversation {
   context: Record<string, any>;
   lastUpdated: string;
 }
+
+// Public Tracking Boundary Types
+export * from './tracking';
